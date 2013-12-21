@@ -1,0 +1,239 @@
+<!DOCTYPE html><html><head><meta charset="utf-8" /><meta content="noindex,follow" name="robots" /><title>Nonlinear selection of tmux panes and Vim splits for seamless navigation - The Terminal Programmer</title><meta content="2015-05-05T17:43:38-07:00" name="DCTERMS.created" /><meta content="2015-05-05T17:43:38-07:00" name="DCTERMS.modified" /><meta content="Suraj N. Kurapati" name="author" /><meta content="solution, usability, tmux, vim" name="keywords" /><meta content="Readably https://github.com/sunaku/readably" name="generator" /><link href="style.css" rel="stylesheet" type="text/css" /><link href="index.atom" rel="alternate" title="feed" type="application/atom+xml" /></head><body><article data-entry-id="tmux-select-pane" id="body"><header><div class="navigation"><a class="rootlink" href="index.html#tmux-select-pane" title="The Terminal Programmer"><span>The Terminal Programmer</span></a></div><h1 class="title">Nonlinear selection of tmux panes and Vim splits for seamless navigation</h1><div class="author">Suraj N. Kurapati</div><time class="date" datetime="2015-05-05T17:43:38-07:00"> 5 May 2015</time></header><hr /><div class="description"></div><div class="content"><ol class="table-of-contents"><li><a id="__problem__" href="#problem" class="downlink">Problem</a><ol></ol></li><li><a id="__approach__" href="#approach" class="downlink">Approach</a><ol></ol></li><li><a id="__solution__" href="#solution" class="downlink">Solution</a><ol><li><a id="__dvorak-layout-d-h-t-n-s__" href="#dvorak-layout-d-h-t-n-s" class="downlink">Dvorak layout (D-H-T-N-S)</a><ol></ol></li><li><a id="__standard-layout-h-j-k-l__" href="#standard-layout-h-j-k-l" class="downlink">Standard layout (H-J-K-L-;)</a><ol></ol></li></ol></li><li><a id="__explanation__" href="#explanation" class="downlink">Explanation</a><ol></ol></li></ol>
+<h1 id="problem">Problem<a href="#__problem__" class="uplink" title="Contents"></a><a href="#problem" class="permalink" title="Permalink"></a></h1>
+
+<p>When you run <code>tmux select-pane</code> inside a zoomed pane, to select
+a different pane, the originally zoomed pane becomes <em>un</em>zoomed. When this
+behavior is coupled with <a href="https://github.com/christoomey/vim-tmux-navigator">vim-tmux-navigator</a>&rsquo;s power to <a href="https://robots.thoughtbot.com/seamlessly-navigate-vim-and-tmux-splits">seamlessly</a>
+select tmux panes and Vim splits alike using the <em>same</em> key bindings, it
+makes unintentional pane <em>un</em>zooming a woefully frequent occasion.</p>
+
+<h1 id="approach">Approach<a href="#__approach__" class="uplink" title="Contents"></a><a href="#approach" class="permalink" title="Permalink"></a></h1>
+
+<p>To solve this problem, we&rsquo;ll change our selection key bindings to behave
+nonlinearly, as follows:</p>
+
+<ol>
+<li><p>When the current pane is zoomed, <em>do nothing</em>.</p></li>
+<li><p>When the current pane is zoomed <em>and</em> running Vim, only select Vim
+splits <em>inside</em> the current pane: do not venture beyond it.</p></li>
+<li><p>When the current pane is <em>un</em>zoomed, <a href="https://robots.thoughtbot.com/seamlessly-navigate-vim-and-tmux-splits">seamlessly</a> navigate
+between tmux panes and Vim splits alike using <a href="https://github.com/christoomey/vim-tmux-navigator">vim-tmux-navigator</a>.</p></li>
+</ol>
+
+<p>Since the desired behavior has three cases, we can simply encode them as
+a pair of bits which together compose an integer value between 0 and 3:</p>
+
+<table><thead>
+<tr>
+<th>Encoding</th>
+<th>Bit pair</th>
+<th>Pane is Vim?</th>
+<th>Pane is zoomed?</th>
+<th>Action</th>
+</tr>
+</thead><tbody>
+<tr>
+<td>0</td>
+<td>00</td>
+<td>No</td>
+<td>No</td>
+<td>Select tmux pane.</td>
+</tr>
+<tr>
+<td>1</td>
+<td>01</td>
+<td>No</td>
+<td>Yes</td>
+<td>Do nothing.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>10</td>
+<td>Yes</td>
+<td>No</td>
+<td>Use <a href="https://github.com/christoomey/vim-tmux-navigator">vim-tmux-navigator</a>.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>11</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Select Vim split.</td>
+</tr>
+</tbody></table>
+
+<p>Now, we can simply store these cases in a lookup table and then index it
+using the encoded value we formed from our bit pair, as described above.</p>
+
+<h1 id="solution">Solution<a href="#__solution__" class="uplink" title="Contents"></a><a href="#solution" class="permalink" title="Permalink"></a></h1>
+
+<h2 id="dvorak-layout-d-h-t-n-s">Dvorak layout (D-H-T-N-S)<a href="#__dvorak-layout-d-h-t-n-s__" class="uplink" title="Contents"></a><a href="#dvorak-layout-d-h-t-n-s" class="permalink" title="Permalink"></a></h2>
+
+<p>In your <code>~/.vimrc</code> file:</p>
+<pre class="highlight viml"><code>nnoremap <span class="p">&lt;</span><span class="k">silent</span><span class="p">&gt;</span> <span class="p">&lt;</span>A<span class="p">-</span><span class="k">d</span><span class="p">&gt;</span> <span class="p">:</span>TmuxNavigatePrevious<span class="p">&lt;</span>Return<span class="p">&gt;</span>
+nnoremap <span class="p">&lt;</span><span class="k">silent</span><span class="p">&gt;</span> <span class="p">&lt;</span>A<span class="p">-</span><span class="k">h</span><span class="p">&gt;</span> <span class="p">:</span>TmuxNavigateLeft<span class="p">&lt;</span>Return<span class="p">&gt;</span>
+nnoremap <span class="p">&lt;</span><span class="k">silent</span><span class="p">&gt;</span> <span class="p">&lt;</span>A<span class="p">-</span><span class="k">t</span><span class="p">&gt;</span> <span class="p">:</span>TmuxNavigateUp<span class="p">&lt;</span>Return<span class="p">&gt;</span>
+nnoremap <span class="p">&lt;</span><span class="k">silent</span><span class="p">&gt;</span> <span class="p">&lt;</span>A<span class="p">-</span><span class="k">n</span><span class="p">&gt;</span> <span class="p">:</span>TmuxNavigateDown<span class="p">&lt;</span>Return<span class="p">&gt;</span>
+nnoremap <span class="p">&lt;</span><span class="k">silent</span><span class="p">&gt;</span> <span class="p">&lt;</span>A<span class="p">-</span>s<span class="p">&gt;</span> <span class="p">:</span>TmuxNavigateRight<span class="p">&lt;</span>Return<span class="p">&gt;</span>
+</code></pre>
+
+<p>In your <code>~/.tmux.conf</code> file:</p>
+<pre class="highlight shell"><code><span class="nb">bind</span>-key -n M-d run-shell                                     <span class="s1">' \
+  test #{window_zoomed_flag} -eq 0; max=$?;                     \
+  cmd="#{pane_current_command}"; test -n "${cmd#*vim}"; vim=$?; \
+  if test $max -eq 1 -a $vim -eq 1; then                        \
+    tmux send-keys C-w p;                                       \
+  else                                                          \
+    tmux select-pane -l;                                        \
+  fi                                                            \
+'</span>
+<span class="nb">bind</span>-key -n M-h run-shell                                     <span class="s1">' \
+  test #{window_zoomed_flag} -eq 0; max=$?;                     \
+  cmd="#{pane_current_command}"; test -n "${cmd#*vim}"; vim=$?; \
+  set --                                                        \
+    "tmux select-pane -L"                                       \
+    ""                                                          \
+    "tmux send-keys M-h"                                        \
+    "tmux send-keys C-w h";                                     \
+  shift $(( 2*vim + max ));                                     \
+  eval "$1";                                                    \
+'</span>
+<span class="nb">bind</span>-key -n M-t run-shell                                     <span class="s1">' \
+  test #{window_zoomed_flag} -eq 0; max=$?;                     \
+  cmd="#{pane_current_command}"; test -n "${cmd#*vim}"; vim=$?; \
+  set --                                                        \
+    "tmux select-pane -U"                                       \
+    ""                                                          \
+    "tmux send-keys M-t"                                        \
+    "tmux send-keys C-w k";                                     \
+  shift $(( 2*vim + max ));                                     \
+  eval "$1";                                                    \
+'</span>
+<span class="nb">bind</span>-key -n M-n run-shell                                     <span class="s1">' \
+  test #{window_zoomed_flag} -eq 0; max=$?;                     \
+  cmd="#{pane_current_command}"; test -n "${cmd#*vim}"; vim=$?; \
+  set --                                                        \
+    "tmux select-pane -D"                                       \
+    ""                                                          \
+    "tmux send-keys M-n"                                        \
+    "tmux send-keys C-w j";                                     \
+  shift $(( 2*vim + max ));                                     \
+  eval "$1";                                                    \
+'</span>
+<span class="nb">bind</span>-key -n M-s run-shell                                     <span class="s1">' \
+  test #{window_zoomed_flag} -eq 0; max=$?;                     \
+  cmd="#{pane_current_command}"; test -n "${cmd#*vim}"; vim=$?; \
+  set --                                                        \
+    "tmux select-pane -R"                                       \
+    ""                                                          \
+    "tmux send-keys M-s"                                        \
+    "tmux send-keys C-w l";                                     \
+  shift $(( 2*vim + max ));                                     \
+  eval "$1";                                                    \
+'</span>
+</code></pre>
+
+<h2 id="standard-layout-h-j-k-l">Standard layout (H-J-K-L-;)<a href="#__standard-layout-h-j-k-l__" class="uplink" title="Contents"></a><a href="#standard-layout-h-j-k-l" class="permalink" title="Permalink"></a></h2>
+
+<p>In your <code>~/.vimrc</code> file:</p>
+<pre class="highlight viml"><code>nnoremap <span class="p">&lt;</span><span class="k">silent</span><span class="p">&gt;</span> <span class="p">&lt;</span>A<span class="p">-</span><span class="k">h</span><span class="p">&gt;</span> <span class="p">:</span>TmuxNavigateLeft<span class="p">&lt;</span>Return<span class="p">&gt;</span>
+nnoremap <span class="p">&lt;</span><span class="k">silent</span><span class="p">&gt;</span> <span class="p">&lt;</span>A<span class="p">-</span><span class="k">j</span><span class="p">&gt;</span> <span class="p">:</span>TmuxNavigateDown<span class="p">&lt;</span>Return<span class="p">&gt;</span>
+nnoremap <span class="p">&lt;</span><span class="k">silent</span><span class="p">&gt;</span> <span class="p">&lt;</span>A<span class="p">-</span><span class="k">k</span><span class="p">&gt;</span> <span class="p">:</span>TmuxNavigateUp<span class="p">&lt;</span>Return<span class="p">&gt;</span>
+nnoremap <span class="p">&lt;</span><span class="k">silent</span><span class="p">&gt;</span> <span class="p">&lt;</span>A<span class="p">-</span><span class="k">l</span><span class="p">&gt;</span> <span class="p">:</span>TmuxNavigateRight<span class="p">&lt;</span>Return<span class="p">&gt;</span>
+nnoremap <span class="p">&lt;</span><span class="k">silent</span><span class="p">&gt;</span> <span class="p">&lt;</span>A<span class="p">-</span>;<span class="p">&gt;</span> <span class="p">:</span>TmuxNavigatePrevious<span class="p">&lt;</span>Return<span class="p">&gt;</span>
+</code></pre>
+
+<p>In your <code>~/.tmux.conf</code> file:</p>
+<pre class="highlight shell"><code><span class="nb">bind</span>-key -n M-h run-shell                                     <span class="s1">' \
+  test #{window_zoomed_flag} -eq 0; max=$?;                     \
+  cmd="#{pane_current_command}"; test -n "${cmd#*vim}"; vim=$?; \
+  set --                                                        \
+    "tmux select-pane -L"                                       \
+    ""                                                          \
+    "tmux send-keys M-h"                                        \
+    "tmux send-keys C-w h";                                     \
+  shift $(( 2*vim + max ));                                     \
+  eval "$1";                                                    \
+'</span>
+<span class="nb">bind</span>-key -n M-j run-shell                                     <span class="s1">' \
+  test #{window_zoomed_flag} -eq 0; max=$?;                     \
+  cmd="#{pane_current_command}"; test -n "${cmd#*vim}"; vim=$?; \
+  set --                                                        \
+    "tmux select-pane -D"                                       \
+    ""                                                          \
+    "tmux send-keys M-j"                                        \
+    "tmux send-keys C-w j";                                     \
+  shift $(( 2*vim + max ));                                     \
+  eval "$1";                                                    \
+'</span>
+<span class="nb">bind</span>-key -n M-k run-shell                                     <span class="s1">' \
+  test #{window_zoomed_flag} -eq 0; max=$?;                     \
+  cmd="#{pane_current_command}"; test -n "${cmd#*vim}"; vim=$?; \
+  set --                                                        \
+    "tmux select-pane -U"                                       \
+    ""                                                          \
+    "tmux send-keys M-k"                                        \
+    "tmux send-keys C-w k";                                     \
+  shift $(( 2*vim + max ));                                     \
+  eval "$1";                                                    \
+'</span>
+<span class="nb">bind</span>-key -n M-l run-shell                                     <span class="s1">' \
+  test #{window_zoomed_flag} -eq 0; max=$?;                     \
+  cmd="#{pane_current_command}"; test -n "${cmd#*vim}"; vim=$?; \
+  set --                                                        \
+    "tmux select-pane -R"                                       \
+    ""                                                          \
+    "tmux send-keys M-l"                                        \
+    "tmux send-keys C-w l";                                     \
+  shift $(( 2*vim + max ));                                     \
+  eval "$1";                                                    \
+'</span>
+<span class="nb">bind</span>-key -n M-; run-shell                                     <span class="s1">' \
+  test #{window_zoomed_flag} -eq 0; max=$?;                     \
+  cmd="#{pane_current_command}"; test -n "${cmd#*vim}"; vim=$?; \
+  if test $max -eq 1 -a $vim -eq 1; then                        \
+    tmux send-keys C-w p;                                       \
+  else                                                          \
+    tmux select-pane -l;                                        \
+  fi                                                            \
+'</span>
+</code></pre>
+
+<h1 id="explanation">Explanation<a href="#__explanation__" class="uplink" title="Contents"></a><a href="#explanation" class="permalink" title="Permalink"></a></h1>
+
+<p>Let&rsquo;s examine the long, one-line shell commands in the tmux key bindings above.</p>
+
+<p>First, we record whether the current pane is zoomed in the lower bit:</p>
+<pre class="highlight shell"><code><span class="nb">test</span> <span class="c">#{window_zoomed_flag} -eq 0;</span>
+<span class="nv">max</span><span class="o">=</span><span class="nv">$?</span>;
+</code></pre>
+
+<p>Second, we record whether the current pane is running Vim in the upper bit:</p>
+<pre class="highlight shell"><code><span class="nv">cmd</span><span class="o">=</span><span class="s2">"#{pane_current_command}"</span>;
+<span class="nb">test</span> -n <span class="s2">"</span><span class="k">${</span><span class="nv">cmd</span><span class="p">#*vim</span><span class="k">}</span><span class="s2">"</span>;
+<span class="nv">vim</span><span class="o">=</span><span class="nv">$?</span>;
+</code></pre>
+
+<p>Next, we build a lookup table. Since <a href="http://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html">POSIX sh</a>ell lacks arrays, <a href="http://www.etalabs.net/sh_tricks.html">as Rich
+Felker explains</a> in &ldquo;Working with
+arrays&rdquo;, we shall use the command-line argument list as a makeshift array:</p>
+<pre class="highlight shell"><code><span class="c"># Encoding:       0           1            2                     3</span>
+<span class="c"># Bit pair:      00          01           10                    11</span>
+<span class="nb">set</span> -- <span class="s2">"tmux select-pane -L"</span> <span class="s2">""</span> <span class="s2">"tmux send-keys M-h"</span> <span class="s2">"tmux send-keys C-w h"</span>;
+</code></pre>
+
+<p>Now we can index the lookup table using the encoded value by shifting
+(removing from the front of the array) that number of items to reach the
+command we are trying to index and then finally run the indexed command:</p>
+<pre class="highlight shell"><code><span class="nb">shift</span> <span class="k">$((</span> <span class="m">2</span><span class="o">*</span>vim <span class="o">+</span> max <span class="k">))</span>;
+<span class="nb">eval</span> <span class="s2">"</span><span class="nv">$1</span><span class="s2">"</span>
+</code></pre>
+
+<p>When this happens, the appropriate tmux pane selection action is performed
+either directly by tmux or through the synthetic keystrokes sent to
+<a href="https://github.com/christoomey/vim-tmux-navigator">vim-tmux-navigator</a>.</p>
+
+<p>That&rsquo;s all!  Enjoy the power of binary encoding and nonlinearity. :-)</p>
+</div><div class="comments" id="comments"><script>var disqus_container_id = 'comments';
+var disqus_title = "Nonlinear selection of tmux panes and Vim splits for seamless navigation";
+var disqus_url = "https://sunaku.github.io/tmux-select-pane.html";</script><script async="" src="https://theterminalprogrammer.disqus.com/embed.js"></script></div><hr /><footer><p class="copyright">&copy; 2015 Suraj N. Kurapati</p><p class="credits"><a href="https://github.com/sunaku/readably">Readably</a> written, <a href="https://github.com/morhetz/gruvbox">Gruvbox</a> colored. </p></footer><!--[if lt IE 9]><script src="js/html5shiv.min.js"></script><script src="js/html5shiv-printshiv.min.js"></script><![endif]--><script src="js/zepto.min.js"></script><script src="index.js"></script></article></body></html>
